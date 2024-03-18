@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit.logger import get_logger
 import uuid
 import json
 import os
@@ -12,10 +13,12 @@ from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.chains import create_history_aware_retriever, create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
+from chromadb import Collection
 
 import chromadb
 
 load_dotenv()
+logger = get_logger(__name__)
 
 def populate_vectorstore_from_url(url, collection_name):
 
@@ -29,12 +32,17 @@ def populate_vectorstore_from_url(url, collection_name):
 
     # create a vector store from the chunks
     #vector_store = chroma.Chroma.from_documents(document_chunks, OpenAIEmbeddings())
-    vector_store = Chroma.from_documents(document_chunks, SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2"), collection_name=collection_name)
+    vector_store = Chroma.from_documents(
+        document_chunks, 
+        SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2"), 
+        collection_name=collection_name,
+        persist_directory="./db/")
     return vector_store
 
 def get_vectorstore(url):
     # check if the url is in the visited_urls file
     if visited_url(url):
+        logger.info("getting vectorstore")
         persistent_client = chromadb.PersistentClient("./db/")
         vectorstore = Chroma(
             client=persistent_client,
@@ -44,6 +52,7 @@ def get_vectorstore(url):
         )
         return vectorstore
     else:
+        logger.info("CREATING vectorstore")
         vectorstore = create_vectorstore(url) # vectorstore
         return vectorstore
         
@@ -126,6 +135,7 @@ else:
         ]
     if "vector_store" not in st.session_state:
         st.session_state.vector_store = get_vectorstore(website_url)
+        st.write(st.session_state.vector_store.get())
 
     # user input
     user_query = st.chat_input("Type your message here...")
