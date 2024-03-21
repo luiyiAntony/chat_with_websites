@@ -1,2 +1,6 @@
 .venv
 .env
+db/*
+chromadb_tutorials/
+langchain_tutorials/
+streamlit_tutorials/

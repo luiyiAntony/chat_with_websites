@@ -83,6 +83,16 @@ def visited_url(url):
         data = json.load(f)
     return url in data
 
+def get_visited_urls():
+    # verificar que el archivo exista
+    if not os.path.isfile("./db/visited_urls.json"):
+        with open("./db/visited_urls.json", "w") as f:
+            json.dump({}, f)
+    #
+    with open("./db/visited_urls.json", "r") as f:
+        data = json.load(f)
+    return data
+
 def get_context_retriever_chain(vector_store):
     llm = ChatOpenAI()
     retriever = vector_store.as_retriever()
@@ -112,36 +122,37 @@ def get_response(user_input):
 
     response = conversation_rag_chain.invoke({
         "chat_history": st.session_state.chat_history,
-        "input": user_query
+        "input": user_input
     })
-    #return response['answer']
-    return response
+    return response['answer']
 
-# app config
-st.set_page_config(page_title="Chat websites", page_icon="")
-st.title("Chat with websites")
+def change_url(url):
+    st.session_state.clear()
+    st.session_state.website_url = url
 
-# sidebar
-with st.sidebar:
-    website_url = st.text_input("Website URL")
+def change_input_url():
+    url = st.session_state["website_url"]
+    st.session_state.clear()
+    st.session_state["website_url"] = url
 
-if website_url is None or website_url == "":
-    st.info("Please enter a website URL")
-else:
-    # session state
+###################################################
+# RELATED WITH THE INTERFACE
+###################################################
+
+def check_session_state():
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = [
             AIMessage(content="Hello, I'm a bot how can I help you?"),
         ]
     if "vector_store" not in st.session_state:
         st.session_state.vector_store = get_vectorstore(website_url)
-        st.write(st.session_state.vector_store.get())
+        logger.info(st.session_state.vector_store.get())
 
+def chat():
     # user input
     user_query = st.chat_input("Type your message here...")
     if user_query is not None and user_query != "":
         response = get_response(user_query)
-        st.write(response)
         st.session_state.chat_history.append(HumanMessage(content=user_query))
         st.session_state.chat_history.append(AIMessage(content=response))
 
@@ -153,3 +164,26 @@ else:
         elif isinstance(message, HumanMessage):
             with st.chat_message("human"):
                 st.write(message.content)
+
+
+# app config
+st.set_page_config(page_title="Chat websites", page_icon="")
+st.title("Chat with websites")
+
+# sidebar
+with st.sidebar:
+    website_url = st.text_input("New Website URL", key="website_url", on_change=change_input_url)
+    st.write("Previous URLs")
+    with st.container(height=330, border=0):
+        urls = get_visited_urls()
+        for url in urls:
+            st.button(url, on_click=change_url, args=[url])
+
+if website_url is None or website_url == "":
+    st.info("Please enter a website URL")
+else:
+    # session state
+    check_session_state()
+
+    # chat
+    chat()
